@@ -112,7 +112,9 @@ with st.sidebar:
         "CSV 파일을 업로드 해주세요.", type=["csv"]
     )  # CSV 파일 업로드 기능
     selected_model = st.selectbox(
-        "OpenAI 모델을 선택해주세요.", ["gpt-4o", "gpt-4o-mini"], index=0
+        "OpenAI 모델을 선택해주세요.",
+        ["gpt-4.1", "gpt-4.1-mini", "gpt-4o", "gpt-4o-mini"],
+        index=0,
     )  # OpenAI 모델 선택 옵션
 
     user_column_guideline = st.text_area("컬럼 가이드라인")
@@ -195,7 +197,7 @@ def result_callback(result: str) -> None:
 # 에이전트 생성 함수
 def create_agent(
     dataframe,
-    selected_model="gpt-4o",
+    selected_model="gpt-4.1-mini",
     prefix_prompt=None,
     postfix_prompt=None,
     user_column_guideline=None,
@@ -205,7 +207,7 @@ def create_agent(
 
     Args:
         dataframe (pd.DataFrame): 분석할 데이터프레임
-        selected_model (str, optional): 사용할 OpenAI 모델. 기본값은 "gpt-4o"
+        selected_model (str, optional): 사용할 OpenAI 모델. 기본값은 "gpt-4.1-mini"
 
     Returns:
         Agent: 생성된 데이터프레임 에이전트
@@ -243,13 +245,22 @@ def ask(query):
         stream_parser = AgentStreamParser(parser_callback)
 
         with st.chat_message("assistant"):
+            has_dataframe = False
             for step in response:
                 stream_parser.process_agent_steps(step)
                 if "output" in step:
                     ai_answer += step["output"]
-            st.write(ai_answer)
-
-        add_message(MessageRole.ASSISTANT, [MessageType.TEXT, ai_answer])
+                # DataFrame이 출력되었는지 확인
+                if st.session_state["messages"] and st.session_state["messages"][-1][0] == MessageRole.ASSISTANT:
+                    for content in st.session_state["messages"][-1][1]:
+                        if isinstance(content, list) and content[0] == MessageType.DATAFRAME:
+                            has_dataframe = True
+                            break
+            
+            # DataFrame이 출력되지 않은 경우에만 텍스트 답변 출력
+            if not has_dataframe and ai_answer:
+                st.write(ai_answer)
+                add_message(MessageRole.ASSISTANT, [MessageType.TEXT, ai_answer])
 
 
 # 메인 로직
